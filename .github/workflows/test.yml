@@ -51,5 +51,11 @@ jobs:
           set -euo pipefail
           sudo env FD_BACKUP_DIR="$RUNNER_TEMP/flat_detector_backup_proof" bash scripts/backup_verify.sh
           test "$(sudo find "$RUNNER_TEMP/flat_detector_backup_proof" -maxdepth 1 -type f -name '*.dump' | wc -l)" -eq 1
+      - name: "Owner-only Telegram pilot dry-run (zero real messages)"
+        run: |
+          set -euo pipefail
+          docker compose --profile telegram run --rm --no-deps -T bot python -c 'from datetime import datetime, timezone; from flat_detector.database import Session; from flat_detector.models import Subscriber; db=Session(); db.add(Subscriber(chat_id=999999, active=True, consent_at=datetime.now(timezone.utc))); db.commit(); db.close()'
+          docker compose --profile telegram run --rm --no-deps -T bot python -m flat_detector.pilot | tee "$RUNNER_TEMP/pilot-dry-run.log"
+          grep -q "DRY RUN ONLY" "$RUNNER_TEMP/pilot-dry-run.log"
       - name: Compile
         run: python -m compileall -q flat_detector

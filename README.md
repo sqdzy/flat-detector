@@ -30,6 +30,26 @@ After updating `feat/mvp-v0.2`, do not invoke `up --no-build migrate` until the 
 
 For the initialized staging deployment only, run `sudo bash scripts/backup_verify.sh`. It creates a root-only local PostgreSQL custom-format archive and tests restoration into a randomly named isolated verification database on the same flat-detector PostgreSQL cluster. It does **not** recreate or overwrite the live database and does not interact with any other Compose project. Review [the backup and recovery guide](docs/BACKUP_RUNBOOK.md) first. **This unencrypted on-host backup is not an off-site disaster recovery solution**.
 
+## One-recipient Telegram delivery proof (owner-invoked only)
+
+The bot already supports real private opt-in; the standalone `flat_detector.pilot` tests a **single** actual Telegram `sendMessage` without enabling the automated scheduler/sender or writing synthetic properties to PostgreSQL. It refuses to run unless the database has **exactly one** active subscriber with recorded consent. Confirm that this sole subscriber is your own chat before using `--send`.
+
+```bash
+cd /opt/flat-detector
+git status --short
+git pull --ff-only origin feat/mvp-v0.2
+docker compose --env-file .env build web
+docker compose --env-file .env --profile telegram run --rm --no-deps -T bot python -m flat_detector.pilot
+# Inspect dry-run output before explicitly sending one fictional sample:
+docker compose --env-file .env --profile telegram run --rm --no-deps -T bot python -m flat_detector.pilot --send
+```
+
+Both commands operate on the same single local project database; the first is read-only and does not read the Telegram token. The second sends **one** marked fictional example to that **sole** consenting subscriber and redacts error details to prevent leaking the token. Never retry after an ambiguous network failure without first checking the actual chat. There are no actual listings yet.
+
+## Source access research
+
+[Verified source-channel research (2026-09-24)](docs/SOURCE_DISCOVERY_2026-09-24.md) distinguishes approved publisher/partner APIs from permission for global buyer-oriented search. CIAN, Avito and Domclick real-estate search collection remains disabled pending confirmed access rights; until then use manual own observations and explicitly distinguish **unverified** links from active listings.
+
 ## Safety and rollout
 
 Read [deployment guide](docs/DEPLOYMENT.md) and [source rights](docs/SOURCE_POLICY.md) before enabling network access or the Telegram profile. `FD_DEMO_MODE=true` imports three **fictional** listings; `FD_DEMO_DELIVERY=false` prevents synthetic listings from being delivered externally. No real CIAN/Avito/Domclick adapter is enabled or implemented. API feed does not grant publisher rights by itself.
