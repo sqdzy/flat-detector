@@ -32,5 +32,12 @@ jobs:
         run: python -m pip install -r requirements-dev.txt
       - name: Unit, MCP SDK and PostgreSQL integration tests
         run: python -m pytest -q --cov=flat_detector --cov-report=term-missing
+      - name: Validate Docker Compose configuration (no containers started)
+        run: |
+          mkdir -p deploy/secrets
+          printf 'ci-example-only\n' > deploy/secrets/postgres_password_app
+          printf 'ci-example-only\n' > deploy/secrets/postgres_password_db
+          printf 'ci-example-only\n' > deploy/secrets/telegram_token
+          docker compose --profile telegram --profile mcp --profile approved_feed config --quiet
       - name: Compile
         run: python -m compileall -q flat_detector

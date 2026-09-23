@@ -1,8 +1,8 @@
-# Live PostgreSQL validation — staged in CI, not yet executed
+# Live PostgreSQL validation — passed in GitHub Actions on 2026-09-23
 
 `tests/test_postgres_integration.py` is deliberately **skipped** locally unless `FD_PG_INTEGRATION_DSN` specifies `postgresql+psycopg://...`. SQLite cannot substitute for `SELECT ... FOR UPDATE SKIP LOCKED` or verify PostgreSQL schema behavior.
 
-The repository includes `.github/workflows/test.yml`, which starts a disposable PostgreSQL 17 service. After pushing the code, CI must:
+The repository includes `.github/workflows/test.yml`, which starts a disposable PostgreSQL 17 service. After publishing, [GitHub CI run 35910378865](https://github.com/sqdzy/flat-detector/actions/runs/35910378865) completed with **40 passed** and **84% line coverage**. Its ephemeral PostgreSQL 17 integration test performed:
 
 1. Install the pinned project and development dependencies in Python 3.13.
 2. Create a uniquely named test schema, inject an existing PostgreSQL connection into Alembic and run the real migration `upgrade head`.
@@ -14,4 +14,4 @@ The repository includes `.github/workflows/test.yml`, which starts a disposable 
 
 The CI database password is an ephemeral dummy for test containers only. It must never be reused for production. **No outgoing Telegram requests, marketplace collection or production DB access** are made by this test. A passed CI status will be evidence of PostgreSQL migration/concurrency for this code revision only; it does not prove full live deployment.
 
-Until the CI job has been observed successful, real PostgreSQL migration and concurrent delivery remain a deployment gate.
+The ephemeral PostgreSQL CI gate is **passed for commit `72287f8ec80575e5bce3f1837b698060893b8780`**. Real staging remains a separate gate: Docker Compose config/build/health, scoped secrets and backup/restore must be validated on the target VPS. Any later commit requires its own green CI run.

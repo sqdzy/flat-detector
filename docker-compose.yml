@@ -16,7 +16,9 @@ x-app: &app
     FD_DB_PASSWORD_FILE: /run/secrets/postgres_password
     FD_DEMO_MODE: ${FD_DEMO_MODE:-false}
     FD_DEMO_DELIVERY: ${FD_DEMO_DELIVERY:-false}
-  secrets: [postgres_password]
+  secrets: &app_db_secrets
+    - source: postgres_password_app
+      target: postgres_password
   networks: [internal]
   depends_on:
     db: {condition: service_healthy}
@@ -30,7 +32,10 @@ services:
       POSTGRES_USER: flat_detector
       POSTGRES_DB: flat_detector
       POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
-    secrets: [postgres_password]
+    secrets:
+      - source: postgres_password_db
+        target: postgres_password
+    mem_limit: 512m
     volumes: [pg_data:/var/lib/postgresql/data]
     networks: [internal]
     healthcheck:
@@ -62,7 +67,10 @@ services:
     environment:
       <<: *env
       FD_TELEGRAM_TOKEN_FILE: /run/secrets/telegram_token
-    secrets: [postgres_password, telegram_token]
+    secrets:
+      - source: postgres_password_app
+        target: postgres_password
+      - telegram_token
     depends_on:
       migrate: {condition: service_completed_successfully}
     command: ["python", "-m", "flat_detector.bot"]
@@ -80,7 +88,10 @@ services:
     environment:
       <<: *env
       FD_TELEGRAM_TOKEN_FILE: /run/secrets/telegram_token
-    secrets: [postgres_password, telegram_token]
+    secrets:
+      - source: postgres_password_app
+        target: postgres_password
+      - telegram_token
     depends_on:
       migrate: {condition: service_completed_successfully}
     command: ["python", "-m", "flat_detector.worker", "sender"]
@@ -115,7 +126,9 @@ volumes:
   pg_data:
 
 secrets:
-  postgres_password:
-    file: ./deploy/secrets/postgres_password
+  postgres_password_app:
+    file: ./deploy/secrets/postgres_password_app
+  postgres_password_db:
+    file: ./deploy/secrets/postgres_password_db
   telegram_token:
     file: ./deploy/secrets/telegram_token

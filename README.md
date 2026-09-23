@@ -20,7 +20,7 @@ PYTHONPATH=. python3 -m pytest -q --cov=flat_detector --cov-report=term-missing
 python3 -m compileall -q flat_detector
 ```
 
-In the isolated execution environment used for this delivery: **39 tests passed, 1 real-PostgreSQL integration test intentionally skipped** (no PostgreSQL server/Docker locally). MCP SDK 2.2.0 and psycopg 3.3.6 were downloaded from the completed verified `environment-collector` Drive record and installed with `--no-index` into a **fresh isolated virtualenv** (`pip check`: no broken requirements). All four MCP tools were exercised through an actual SDK Client against synthetic SQLite data; ASGI Streamable HTTP initialize returned **200 on loopback** and denied a foreign Host with **421**. Docker, live Telegram, private tunnel and real PostgreSQL remain untested here. A GitHub Actions CI PostgreSQL service integration gate is included but will only run after source is pushed. See [implementation status](docs/IMPLEMENTATION_STATUS.md).
+In the isolated execution environment used for this delivery: **39 tests passed, 1 real-PostgreSQL integration test intentionally skipped** (no PostgreSQL server/Docker locally). MCP SDK 2.2.0 and psycopg 3.3.6 were downloaded from the completed verified `environment-collector` Drive record and installed with `--no-index` into a **fresh isolated virtualenv** (`pip check`: no broken requirements). All four MCP tools were exercised through an actual SDK Client against synthetic SQLite data; ASGI Streamable HTTP initialize returned **200 on loopback** and denied a foreign Host with **421**. Docker, live Telegram, private tunnel and real PostgreSQL remain untested here. The first [GitHub Actions CI run](https://github.com/sqdzy/flat-detector/actions/runs/35910378865) completed successfully with **40 passed**, including real PostgreSQL 17 migrations and concurrency, and **84% line coverage**. This is CI evidence, not Docker staging or live-service approval. See [implementation status](docs/IMPLEMENTATION_STATUS.md).
 
 ## Safety and rollout
 
@@ -32,4 +32,4 @@ Project docs: [specification](docs/SPEC.md), [architecture](docs/ARCHITECTURE.md
 
 ## Dependency and PostgreSQL evidence
 
-See [reproducible offline MCP dependencies](docs/OFFLINE_DEPENDENCIES.md) and [pending live PostgreSQL CI gate](docs/POSTGRESQL_CI.md). They document what was actually validated and what still requires the remote PostgreSQL CI job.
+See [reproducible offline MCP dependencies](docs/OFFLINE_DEPENDENCIES.md), [passed PostgreSQL CI gate](docs/POSTGRESQL_CI.md) and [isolated staging runbook](docs/STAGING_RUNBOOK.md). Deploy only the database and loopback API first; separate app/DB secret files avoid unsafe shared permissions.
