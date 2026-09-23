@@ -26,6 +26,10 @@ In the isolated execution environment used for this delivery: **39 tests passed,
 
 After updating `feat/mvp-v0.2`, do not invoke `up --no-build migrate` until the common image has been rebuilt. For the existing initialized, healthy flat-detector DB, use `bash scripts/staging_up.sh`: this performs a checked image build, networkless import smoke, migration gate, and loopback health checks, without touching any other Docker project. Full details: [staging runbook](docs/STAGING_RUNBOOK.md).
 
+## Verified database backup
+
+For the initialized staging deployment only, run `sudo bash scripts/backup_verify.sh`. It creates a root-only local PostgreSQL custom-format archive and tests restoration into a randomly named isolated verification database on the same flat-detector PostgreSQL cluster. It does **not** recreate or overwrite the live database and does not interact with any other Compose project. Review [the backup and recovery guide](docs/BACKUP_RUNBOOK.md) first. **This unencrypted on-host backup is not an off-site disaster recovery solution**.
+
 ## Safety and rollout
 
 Read [deployment guide](docs/DEPLOYMENT.md) and [source rights](docs/SOURCE_POLICY.md) before enabling network access or the Telegram profile. `FD_DEMO_MODE=true` imports three **fictional** listings; `FD_DEMO_DELIVERY=false` prevents synthetic listings from being delivered externally. No real CIAN/Avito/Domclick adapter is enabled or implemented. API feed does not grant publisher rights by itself.

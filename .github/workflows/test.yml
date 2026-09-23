@@ -46,5 +46,10 @@ jobs:
           cp .env.example .env
           docker compose --env-file .env up -d --no-build --wait db
           bash scripts/staging_up.sh
+      - name: "Backup archive and isolated PostgreSQL restore verification"
+        run: |
+          set -euo pipefail
+          sudo env FD_BACKUP_DIR="$RUNNER_TEMP/flat_detector_backup_proof" bash scripts/backup_verify.sh
+          test "$(sudo find "$RUNNER_TEMP/flat_detector_backup_proof" -maxdepth 1 -type f -name '*.dump' | wc -l)" -eq 1
       - name: Compile
         run: python -m compileall -q flat_detector

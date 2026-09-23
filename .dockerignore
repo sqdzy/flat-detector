@@ -11,3 +11,7 @@ docs/
 fixtures/
 *.zip
 *.log
+
+backups/
+*.dump
+*.dump.partial
