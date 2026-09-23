@@ -39,5 +39,6 @@ jobs:
           printf 'ci-example-only\n' > deploy/secrets/postgres_password_db
           printf 'ci-example-only\n' > deploy/secrets/telegram_token
           docker compose --profile telegram --profile mcp --profile approved_feed config --quiet
+          docker compose --profile telegram --profile mcp --profile approved_feed config --format json | python -c 'import json,sys; services=json.load(sys.stdin)["services"]; names=("web","migrate","bot","scheduler","sender","mcp","approved_feed"); images={services[n]["image"] for n in names}; assert images == {"flat-detector-app:staging"}, images'
       - name: Compile
         run: python -m compileall -q flat_detector

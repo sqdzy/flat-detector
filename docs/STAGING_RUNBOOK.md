@@ -62,10 +62,17 @@ exit
 cd /opt/flat-detector
 sudo docker compose --env-file .env config --quiet
 sudo docker compose --env-file .env build web
+# This tags the shared flat-detector-app:staging image used by web, migrate and all optional workers.
 # Scope only to this Compose project, starting the database first.
 sudo docker compose --env-file .env up -d db
 sudo docker compose --env-file .env ps db
-sudo docker compose --env-file .env up -d migrate web
+sudo docker compose --env-file .env up -d --no-build migrate
+CID="$(sudo docker compose --env-file .env ps -a -q migrate)"
+test -n "$CID"
+EXIT_CODE="$(sudo docker wait "$CID")"
+printf 'Migration exit code: %s\n' "$EXIT_CODE"
+test "$EXIT_CODE" -eq 0
+sudo docker compose --env-file .env up -d --no-build web
 sudo docker compose --env-file .env ps
 curl --fail --show-error --silent http://127.0.0.1:8005/health/live
 curl --fail --show-error --silent http://127.0.0.1:8005/health/ready
@@ -80,3 +87,7 @@ sudo docker compose --env-file .env logs --tail=60 db migrate web
 2. Telegram: user-owned BotFather token in `deploy/secrets/telegram_token` under UID 10001; explicit private opt-in tests, no demo sends by default.
 3. MCP: private identity-verifying HTTPS proxy/tunnel with negative unauthorized tests; local port 8765 alone is **not authorization**.
 4. Approved partner feed: documentary `search,store,notify` permission and an egress firewall to block DNS-rebinding / internal network access before any external fetch.
+
+## Recovery: missing `flat-detector-migrate:latest` after building only web
+
+Older revisions used a Compose-generated image name per service. `build web` created `flat-detector-web:latest`, but starting `migrate` with `--no-build` failed because `flat-detector-migrate:latest` did not exist. This version gives all Python services the same image tag `flat-detector-app:staging`, avoiding duplicate builds. On an already cloned deployment, retain existing `.env`, `deploy/secrets/*` and DB volume. After checking `git status --short`, run `git pull --ff-only origin feat/mvp-v0.2`, then `docker compose --env-file .env config --quiet` and `docker compose --env-file .env build web`. Only then repeat the migrate / web steps above. **Never** recreate passwords or use `down -v` to address a missing image.

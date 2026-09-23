@@ -1,5 +1,7 @@
 name: flat-detector
 x-app: &app
+  # Build once with `docker compose build web`; all Python services reuse this image.
+  image: flat-detector-app:staging
   build: .
   init: true
   restart: unless-stopped
