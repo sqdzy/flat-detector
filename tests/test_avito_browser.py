@@ -57,3 +57,13 @@ def test_page_state_never_treats_403_or_429_as_listing_removal():
     assert classify_page(503, "", 0) == "UNAVAILABLE"
     assert classify_page(200, "Обычная страница", 0) == "STRUCTURE_CHANGED"
     assert classify_page(200, "Обычная страница", 2) == "OK"
+
+def test_cli_exposes_local_headed_browser_options():
+    from flat_detector.avito_browser import _parser
+    args = _parser().parse_args([
+        "--url", "https://www.avito.ru/himki/kvartiry",
+        "--headed", "--manual-wait", "--channel", "msedge",
+    ])
+    assert args.headed is True
+    assert args.manual_wait is True
+    assert args.channel == "msedge"

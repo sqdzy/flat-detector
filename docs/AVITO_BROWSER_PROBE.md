@@ -58,3 +58,21 @@ None of these states means an apartment was removed.
 Current extraction prefers Avito's public `data-marker="item"` cards, `data-marker="item-title"`, `itemprop="price"` / `data-marker="item-price"`, and `data-marker="item-address"`. These hooks are corroborated by current open-source Avito parser implementations but are not a public compatibility contract, so the live probe must be tested before any DB integration.
 
 The next gate, only after a successful live probe, is to snapshot a **small owner-observed HTML fixture or normalized JSON output**, write a dedicated Avito adapter into the existing evidence model, then run at a conservative interval. Do not wire the live browser directly to Telegram before that.
+
+## Local-machine diagnostic after an immediate VPS 429
+
+If the VPS receives HTTP 429 on the first live request, do not put it into a retry loop. That does not prove the exact blocking signal, but the VPS environment is a poor baseline. Test the same parser once from the owner's normal local network and a visible branded browser.
+
+On Windows PowerShell:
+
+~~~powershell
+git clone -b feat/mvp-v0.2 https://github.com/sqdzy/flat-detector.git
+cd flat-detector
+powershell -ExecutionPolicy Bypass -File .\scripts\windows_avito_probe.ps1 -SearchUrl "PASTE_THE_SAME_AVITO_SEARCH_URL"
+~~~
+
+For an existing checkout, use `git pull --ff-only origin feat/mvp-v0.2` instead of cloning.
+
+The helper creates a dedicated Python environment and dedicated browser profile under `%LOCALAPPDATA%\FlatDetector\AvitoProfile`. It defaults to installed Microsoft Edge, launches visibly and pauses before parsing. Inspect the page; if Avito asks for a normal login or CAPTCHA, complete it manually in that dedicated profile, wait for ordinary results, then press Enter in PowerShell. It does not use the default browser profile, alter fingerprints, rotate proxies, or route traffic through the VPS.
+
+If local output contains real cards while the VPS immediately returns 429, keep browser collection local and send normalized JSON to the VPS over an authenticated channel such as the existing SSH connection. PostgreSQL, Telegram and MCP remain server-side; no new unauthenticated ingest port is needed.

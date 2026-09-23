@@ -209,18 +209,34 @@ def extract_candidates(page, *, limit: int = MAX_ITEMS) -> list[AvitoCandidate]:
     return result
 
 
-def _launch_context(playwright, profile_dir: Path, *, headless: bool = True):
+def _launch_context(
+    playwright,
+    profile_dir: Path,
+    *,
+    headless: bool = True,
+    channel: str | None = None,
+):
     profile_dir.mkdir(parents=True, exist_ok=True)
-    return playwright.chromium.launch_persistent_context(
-        user_data_dir=str(profile_dir),
-        headless=headless,
-        locale="ru-RU",
-        viewport={"width": 1365, "height": 900},
-        accept_downloads=False,
-    )
+    kwargs = {
+        "user_data_dir": str(profile_dir),
+        "headless": headless,
+        "locale": "ru-RU",
+        "viewport": {"width": 1365, "height": 900},
+        "accept_downloads": False,
+    }
+    if channel:
+        kwargs["channel"] = channel
+    return playwright.chromium.launch_persistent_context(**kwargs)
 
 
-def run_live_probe(search_url: str, profile_dir: Path) -> list[AvitoCandidate]:
+def run_live_probe(
+    search_url: str,
+    profile_dir: Path,
+    *,
+    headless: bool = True,
+    channel: str | None = None,
+    manual_wait: bool = False,
+) -> list[AvitoCandidate]:
     """Open exactly one operator-provided Avito search URL and inspect the rendered page."""
     from playwright.sync_api import Error as PlaywrightError
     from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
@@ -230,11 +246,19 @@ def run_live_probe(search_url: str, profile_dir: Path) -> list[AvitoCandidate]:
 
     try:
         with sync_playwright() as pw:
-            context = _launch_context(pw, profile_dir)
+            context = _launch_context(pw, profile_dir, headless=headless, channel=channel)
             try:
                 page = context.pages[0] if context.pages else context.new_page()
                 response = page.goto(search_url, wait_until="domcontentloaded", timeout=45_000)
                 page.wait_for_timeout(1800)
+                if manual_wait:
+                    print(
+                        "MANUAL REVIEW: inspect the visible browser. If Avito shows normal "
+                        "results, press Enter here. If it asks for normal login/CAPTCHA, "
+                        "complete that manually in this dedicated profile, wait for results, "
+                        "then press Enter."
+                    )
+                    input()
 
                 final = urlsplit(page.url)
                 if final.scheme != "https" or (final.hostname or "").lower() not in ALLOWED_HOSTS:
@@ -242,7 +266,12 @@ def run_live_probe(search_url: str, profile_dir: Path) -> list[AvitoCandidate]:
 
                 body = page.locator("body").inner_text(timeout=5000)[:30_000]
                 candidates = extract_candidates(page)
-                state = classify_page(response.status if response else None, body, len(candidates))
+                response_status = response.status if response else None
+                if manual_wait and candidates and not any(
+                    marker in body.lower() for marker in CHALLENGE_MARKERS
+                ):
+                    response_status = 200
+                state = classify_page(response_status, body, len(candidates))
 
                 if state == "RATE_LIMITED":
                     raise SourceRateLimited("Avito returned 429; stop and retry later")
@@ -311,6 +340,18 @@ def _parser() -> argparse.ArgumentParser:
         help="persistent Chromium profile directory",
     )
     parser.add_argument("--limit", type=int, default=20, help="maximum cards printed, 1..50")
+    parser.add_argument("--headed", action="store_true", help="show a visible browser window")
+    parser.add_argument(
+        "--manual-wait",
+        action="store_true",
+        help="wait for Enter before parsing so the owner can inspect/login manually",
+    )
+    parser.add_argument(
+        "--channel",
+        choices=("chromium", "chrome", "msedge"),
+        default=os.getenv("FD_AVITO_BROWSER_CHANNEL") or None,
+        help="optional installed browser channel",
+    )
     return parser
 
 
@@ -323,7 +364,13 @@ def main() -> int:
         return 2
 
     try:
-        candidates = run_live_probe(args.url, Path(args.profile_dir))
+        candidates = run_live_probe(
+            args.url,
+            Path(args.profile_dir),
+            headless=not args.headed,
+            channel=args.channel,
+            manual_wait=args.manual_wait,
+        )
     except ValueError as exc:
         print(f"CONFIG_ERROR: {exc}", file=sys.stderr)
         return 2
