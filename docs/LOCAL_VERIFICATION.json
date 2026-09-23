@@ -1,0 +1,26 @@
+{
+  "release": "0.2.0",
+  "date_utc": "2026-09-23",
+  "local_tests": {
+    "passed": 39,
+    "skipped": 1,
+    "skipped_reason": "real PostgreSQL server unavailable in local container",
+    "line_coverage_percent": 84
+  },
+  "real_mcp_sdk": "2.2.0 (in-memory and streamable HTTP tested)",
+  "offline_wheelhouse": {
+    "artifact_key": "pip-wheelhouse-py3.13.5-linux-x86_64-46b939e8cdca3a71",
+    "outer_sha256": "d61e262249a26e87d8746462ddbe157c9f6c97ac7b211165fedc6255e7cf1345",
+    "inner_hashes_verified": true,
+    "clean_no_network_install_and_pip_check": true
+  },
+  "not_tested": [
+    "live PostgreSQL",
+    "Docker engine runtime",
+    "real Telegram Bot API",
+    "real-estate partner source",
+    "authenticated cloud MCP tunnel"
+  ],
+  "source_url": "https://github.com/sqdzy/flat-detector",
+  "pushed_to_git_repo": false
+}

@@ -1,0 +1,121 @@
+name: flat-detector
+x-app: &app
+  build: .
+  init: true
+  restart: unless-stopped
+  user: "10001:10001"
+  security_opt: ["no-new-privileges:true"]
+  cap_drop: ["ALL"]
+  read_only: true
+  tmpfs: ["/tmp:rw,noexec,nosuid,size=32m"]
+  environment: &env
+    FD_DATABASE_URL: postgresql+psycopg://
+    FD_DB_HOST: db
+    FD_DB_USER: flat_detector
+    FD_DB_NAME: flat_detector
+    FD_DB_PASSWORD_FILE: /run/secrets/postgres_password
+    FD_DEMO_MODE: ${FD_DEMO_MODE:-false}
+    FD_DEMO_DELIVERY: ${FD_DEMO_DELIVERY:-false}
+  secrets: [postgres_password]
+  networks: [internal]
+  depends_on:
+    db: {condition: service_healthy}
+  mem_limit: 384m
+
+services:
+  db:
+    image: postgres:17.11-alpine3.23
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: flat_detector
+      POSTGRES_DB: flat_detector
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets: [postgres_password]
+    volumes: [pg_data:/var/lib/postgresql/data]
+    networks: [internal]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U flat_detector -d flat_detector"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    security_opt: ["no-new-privileges:true"]
+
+  migrate:
+    <<: *app
+    restart: "no"
+    command: ["alembic", "upgrade", "head"]
+
+  web:
+    <<: *app
+    ports: ["127.0.0.1:8005:8000"]
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8000/health/ready')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  bot:
+    <<: *app
+    profiles: ["telegram"]
+    environment:
+      <<: *env
+      FD_TELEGRAM_TOKEN_FILE: /run/secrets/telegram_token
+    secrets: [postgres_password, telegram_token]
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+    command: ["python", "-m", "flat_detector.bot"]
+
+  scheduler:
+    <<: *app
+    profiles: ["telegram"]
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+    command: ["python", "-m", "flat_detector.worker", "scheduler"]
+
+  sender:
+    <<: *app
+    profiles: ["telegram"]
+    environment:
+      <<: *env
+      FD_TELEGRAM_TOKEN_FILE: /run/secrets/telegram_token
+    secrets: [postgres_password, telegram_token]
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+    command: ["python", "-m", "flat_detector.worker", "sender"]
+
+  approved_feed:
+    <<: *app
+    profiles: ["approved_feed"]
+    restart: "no"  # fail closed: denied or malformed partner feed requires owner review
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+    environment:
+      <<: *env
+      FD_FEED_SOURCE_KEY: ${FD_FEED_SOURCE_KEY:-}
+      FD_FEED_URL: ${FD_FEED_URL:-}
+      FD_FEED_ORIGIN: ${FD_FEED_ORIGIN:-}
+      FD_FEED_POLL_SECONDS: ${FD_FEED_POLL_SECONDS:-86400}
+    command: ["python", "-m", "flat_detector.feed_cli"]
+
+  mcp:
+    <<: *app
+    profiles: ["mcp"]
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+    ports: ["127.0.0.1:8765:8765"]
+    command: ["uvicorn", "flat_detector.mcp_server:app", "--host", "0.0.0.0", "--port", "8765", "--no-access-log"]
+
+networks:
+  internal:
+    driver: bridge
+
+volumes:
+  pg_data:
+
+secrets:
+  postgres_password:
+    file: ./deploy/secrets/postgres_password
+  telegram_token:
+    file: ./deploy/secrets/telegram_token

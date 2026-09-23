@@ -1,0 +1,13 @@
+.git
+.venv
+__pycache__
+.pytest_cache
+.env
+*.sqlite
+*.db
+deploy/secrets/
+tests/
+docs/
+fixtures/
+*.zip
+*.log

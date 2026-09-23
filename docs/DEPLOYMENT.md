@@ -1,0 +1,35 @@
+# Pilot deployment (not production-approved)
+
+1. **Security:** run in a dedicated user account or isolated host, not on a sensitive host. Only one scheduler, sender and polling bot replica; no public web or MCP endpoint. Source scrapers are not included because no licensed external source has been confirmed.
+2. Create local secrets files (not git): `deploy/secrets/postgres_password` and, later, `deploy/secrets/telegram_token`. Use mode 0600 and an appropriately restricted owner; Docker Compose bind-mounted file secrets must be readable by container UID 10001 for bot/sender. The database container uses its separate postgres user, so for shared read-only files verify container permissions before launch.
+3. `cp .env.example .env`. The default starts with **no Telegram** and **no MCP**. `docker compose --env-file .env up -d db migrate web` once secrets are created.
+4. Verify `curl http://127.0.0.1:8005/health/live` and `/health/ready` and inspect DB migrations. A healthy endpoint proves DB connectivity, not Telegram connectivity.
+5. Only after the owner supplies BotFather credentials and deliberately enables pilot: `docker compose --profile telegram up -d bot scheduler sender`. Start the bot in a private chat and complete `/start`, `/subscribe`, `/confirm`. Token must never appear in logs, chats, PRs or MCP results.
+6. MCP preview: `docker compose --profile mcp up -d mcp`, local URL `http://127.0.0.1:8765/mcp`. Do **not** route this URL over a public reverse proxy: read-only MCP currently has no application auth middleware. Only connect using an identity-enforcing Secure MCP Tunnel configured under your own ChatGPT account. Verify tunnel identity, access policy, Host/Origin forwarding, and negative unauthorized tests before any exposure.
+7. Test simulation without any real outgoing Telegram message: set `FD_DEMO_MODE=true`, leave `FD_DEMO_DELIVERY=false`, start DB, and run `docker compose run --rm -e FD_DEMO_MODE=true web python -m flat_detector.fixture`; inspect MCP preview; demo subscriber send process will refuse simulated delivery. Demo listings are **fictional**, and no real ad source was contacted.
+8. This release uses only polling for Telegram incoming updates. Never configure Telegram webhook simultaneously.
+
+**Important rollout gate:** run a real PostgreSQL + Telegram mock + SDK v2 Inspector integration suite before switching `FD_DEMO_MODE` off; run 7-day pilot with explicit subscriber consent and confirmed licensed source. Current local tests do **not** prove these external integrations.
+
+## What's missing for production
+
+- Documented licensed real source and real approved geo polygons + route provider, adapter SSRF suite and source health workers.
+- SDK v2 in-memory and HTTP Host smoke now passed. Still requires real-host secure tunnel access review, negative identity tests and OAuth if exposed beyond a private authenticated tunnel.
+- PostgreSQL migration/concurrent-delivery test is in GitHub CI but has not been run here; add backup/restore, privacy policy and data-retention review before real subscribers.
+- Telegram send/stop race integration test on live PostgreSQL, load test and observability dashboards.
+
+## Authorized feed adapter (new pilot slice)
+
+An approved *partner JSON feed* adapter and optional Compose profile now exist. This is **not** a CIAN, Avito or Domclick scraper. It makes at most one operator-specified request per configured interval (default 24h), refuses redirects and non-JSON responses, limits response size to 1 MiB / 50 records, and halts on denial (HTTP 401/403/429/CAPTCHA-like redirect) rather than retrying around controls. It does not extract photos or seller contacts.
+
+Before running it, a human operator MUST:
+
+1. Acquire and archive the provider's current explicit authorization to **automatically search, store and distribute** the relevant listing facts to subscribers. Register an `APPROVED_FEED` database source with `permission_scope=search,store,notify`, actual reviewed `permission_proof`, `permission_checked_at`, `permission_expires_at` and `enabled=true`. A bare `permission_proof` string is an **operator assertion, not independently validated permission**. No partner is pre-registered or pre-enabled in this repository.
+2. Allowlist the provider's exact HTTPS API origin/path and any additional listing link hostnames through an explicit operator-reviewed adapter config. Do not pass caller-provided URLs to collectors or MCP. Deploy egress firewall DNS/IP/redirect controls (deny localhost, RFC1918 and link-local ranges). **The current adapter's fixed-host validation alone is insufficient against DNS rebinding and does not meet the final production SSRF gate**. Put those controls in place and integration-test before external access.
+3. Supply `FD_FEED_SOURCE_KEY`, `FD_FEED_URL`, `FD_FEED_ORIGIN` and optionally `FD_FEED_POLL_SECONDS` (3600..604800) in the host's protected `.env`; then deliberately start `docker compose --profile approved_feed up -d approved_feed`. The profile is disabled by default and the worker will exit on a blocked/malformed response until a human investigates. For a partner requiring bearer authentication, mount a separate secret file for **only** this worker and supply `FD_FEED_TOKEN_FILE` (never commit it).
+4. Feed-provided `geo_approved`, route estimates, and marketing premium claims are **ignored**. Imported data starts geographically unreviewed and does not enter the public digest until an owner independently reviews actual near-Moscow location and route evidence (domain entrypoint `flat_detector.service.approve_route`). A changed address invalidates prior geo approval; unchanged feed refresh preserves it. The current MVP has no admin panel for this review.
+5. Never use scraped or partner feed data from an unapproved source as a test fixture claimed to represent live offers. The synthetic importer is explicitly fictional.
+
+**Current deployment gates:** MCP SDK v2 has now passed real local Client/tool and HTTP Host tests; the exact wheelhouse was downloaded, fully checksum-verified and proved to install offline. Docker executable, real PostgreSQL server, live Telegram token and authenticated external MCP tunnel are still unavailable or deliberately unconfigured in this container. An ephemeral PostgreSQL service and migration/concurrent-delivery test have been added to `.github/workflows/test.yml`; this gate requires pushing code to the project repository before it can run. The permission, DNS egress and credentials restrictions above remain unchanged.
+
+MCP private-tunnel note: our `streamable_http_app()` is configured with explicit `127.0.0.1:8765` and `localhost:8765` Host entries (the SDK empty default returned 421 even for local requests in testing). If the tunnel forwards the external hostname, set explicit `FD_MCP_ALLOWED_HOSTS` (comma-delimited exact hosts, no `*`) and, for browser origins, `FD_MCP_ALLOWED_ORIGINS` (HTTPS origins) in the private MCP container. A 421 indicates mismatched Host. This does not replace the tunnel's identity check or OAuth; do not disable rebind protection to make a 421 disappear.

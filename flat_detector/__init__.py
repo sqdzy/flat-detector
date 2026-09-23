@@ -1,0 +1,1 @@
+"""Flat Detector service."""
