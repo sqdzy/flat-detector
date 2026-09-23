@@ -1,6 +1,6 @@
 # Implementation status — 2026-09-23
 
-**Release stage:** local MVP prototype, not deployed, source-rights and security gates incomplete.
+**Release stage:** reviewed MVP; CI proven with real PostgreSQL and Dockerized migration/API smoke. VPS staging pending successful run of guarded staging script; no Telegram, MCP tunnel or live sources activated.
 
 | Slice | Implemented | Tested here | Remaining gate |
 |---|---|---|---|

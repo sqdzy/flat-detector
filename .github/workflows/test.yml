@@ -40,32 +40,11 @@ jobs:
           printf 'ci-example-only\n' > deploy/secrets/telegram_token
           docker compose --profile telegram --profile mcp --profile approved_feed config --quiet
           docker compose --profile telegram --profile mcp --profile approved_feed config --format json | python -c 'import json,sys; services=json.load(sys.stdin)["services"]; names=("web","migrate","bot","scheduler","sender","mcp","approved_feed"); images={services[n]["image"] for n in names}; assert images == {"flat-detector-app:staging"}, images'
-      - name: Docker image, Alembic migration and loopback API smoke
+      - name: Dockerized staging script integration: build, image provenance, migration, API
         run: |
           set -euo pipefail
-          # Uses only dummy CI secrets created by the previous Compose validation step.
-          docker compose build web
-          docker compose up -d --no-build --wait db
-          docker compose up -d --no-deps --no-build --force-recreate migrate
-          CID="$(docker compose ps -a -q migrate)"
-          test -n "$CID"
-          EXIT_CODE="$(docker wait "$CID")"
-          if [ "$EXIT_CODE" -ne 0 ]; then
-            echo "Migration failed, exit code: $EXIT_CODE"
-            docker compose logs --tail=60 migrate
-            exit 1
-          fi
-          docker compose up -d --no-build web
-          for attempt in $(seq 1 24); do
-            if curl --fail --silent http://127.0.0.1:8005/health/live >/dev/null && \
-               curl --fail --silent http://127.0.0.1:8005/health/ready >/dev/null; then
-              echo "Dockerized migration and both health endpoints passed"
-              exit 0
-            fi
-            sleep 2
-          done
-          docker compose ps -a
-          docker compose logs --tail=60 migrate web
-          exit 1
+          cp .env.example .env
+          docker compose --env-file .env up -d --no-build --wait db
+          bash scripts/staging_up.sh
       - name: Compile
         run: python -m compileall -q flat_detector

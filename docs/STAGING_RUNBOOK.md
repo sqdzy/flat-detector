@@ -2,6 +2,28 @@
 
 **Scope:** PostgreSQL + migration + loopback-only API on `sqdzy/flat-detector`, branch `feat/mvp-v0.2`. No external MCP, Telegram, or web scrapers. Reuse **none** of the existing FamilyCore databases or Docker volumes. `docker compose down -v`, `docker system prune`, and global daemon changes are expressly out of scope.
 
+## Verified one-command recovery and staging gate (preferred)
+
+**Root cause of the repeated VPS failure:** the VPS fast-forwarded to commit `e93a06f` but then ran `docker compose up --no-build migrate` **without rebuilding** the previously created `flat-detector-app:staging` image. Docker documentation requires `docker compose build web` whenever the Dockerfile/source changes. `--no-build` explicitly suppresses rebuilding, so a stale image still lacks `PYTHONPATH=/app`. The previous GitHub CI passed because it built a fresh image; this divergence is reproducible from command semantics, not a new Alembic defect.
+
+Use the repository script instead of manually skipping the build command. It requires an *already healthy* flat-detector database and both existing secret files; it never rotates credentials, removes volumes, enables Telegram/MCP/feeds, or touches other Docker projects. It validates the Compose config, **builds web**, verifies the resulting shared image has `PYTHONPATH=/app`, runs a **networkless, secretless Python import probe**, recreates only the failed migration, aborts if migration exit code is nonzero, and launches the loopback API only after success.
+
+```bash
+cd /opt/flat-detector
+git status --short
+git pull --ff-only origin feat/mvp-v0.2
+bash scripts/staging_up.sh
+```
+
+The same script is executed by GitHub Actions against a disposable PostgreSQL Compose database. For extra read-only evidence *before* the rebuild, inspect the cached image environment without revealing secrets:
+
+```bash
+docker image inspect flat-detector-app:staging \
+  --format '{{range .Config.Env}}{{println .}}{{end}}' | grep '^PYTHONPATH=' || true
+```
+
+An absent `PYTHONPATH=/app` confirms the older cached image. The script should not be invoked on a new host before provisioning separate database secrets and bringing up the flat-detector database. It intentionally does not restart or manipulate the existing database.
+
 ## First review and resource gate (read-only)
 
 ```bash

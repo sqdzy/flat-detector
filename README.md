@@ -22,6 +22,10 @@ python3 -m compileall -q flat_detector
 
 In the isolated execution environment used for this delivery: **39 tests passed, 1 real-PostgreSQL integration test intentionally skipped** (no PostgreSQL server/Docker locally). MCP SDK 2.2.0 and psycopg 3.3.6 were downloaded from the completed verified `environment-collector` Drive record and installed with `--no-index` into a **fresh isolated virtualenv** (`pip check`: no broken requirements). All four MCP tools were exercised through an actual SDK Client against synthetic SQLite data; ASGI Streamable HTTP initialize returned **200 on loopback** and denied a foreign Host with **421**. Docker, live Telegram, private tunnel and real PostgreSQL remain untested here. The first [GitHub Actions CI run](https://github.com/sqdzy/flat-detector/actions/runs/35910378865) completed successfully with **40 passed**, including real PostgreSQL 17 migrations and concurrency, and **84% line coverage**. This is CI evidence, not Docker staging or live-service approval. See [implementation status](docs/IMPLEMENTATION_STATUS.md).
 
+## Idempotent staging recovery on existing VPS
+
+After updating `feat/mvp-v0.2`, do not invoke `up --no-build migrate` until the common image has been rebuilt. For the existing initialized, healthy flat-detector DB, use `bash scripts/staging_up.sh`: this performs a checked image build, networkless import smoke, migration gate, and loopback health checks, without touching any other Docker project. Full details: [staging runbook](docs/STAGING_RUNBOOK.md).
+
 ## Safety and rollout
 
 Read [deployment guide](docs/DEPLOYMENT.md) and [source rights](docs/SOURCE_POLICY.md) before enabling network access or the Telegram profile. `FD_DEMO_MODE=true` imports three **fictional** listings; `FD_DEMO_DELIVERY=false` prevents synthetic listings from being delivered externally. No real CIAN/Avito/Domclick adapter is enabled or implemented. API feed does not grant publisher rights by itself.
