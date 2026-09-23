@@ -46,6 +46,10 @@ docker compose --env-file .env --profile telegram run --rm --no-deps -T bot pyth
 
 Both commands operate on the same single local project database; the first is read-only and does not read the Telegram token. The second sends **one** marked fictional example to that **sole** consenting subscriber and redacts error details to prevent leaking the token. Never retry after an ambiguous network failure without first checking the actual chat. There are no actual listings yet.
 
+## Free browser-scraper feasibility probe
+
+An isolated, read-only Avito Playwright probe is available under the `scraper` Compose profile. It has no DB/bot secrets and writes nothing to the application database. Start with the offline Chromium smoke, then run one operator-provided public search URL. See [Avito browser probe](docs/AVITO_BROWSER_PROBE.md).
+
 ## Source access research
 
 [Verified source-channel research (2026-09-24)](docs/SOURCE_DISCOVERY_2026-09-24.md) distinguishes approved publisher/partner APIs from permission for global buyer-oriented search. CIAN, Avito and Domclick real-estate search collection remains disabled pending confirmed access rights; until then use manual own observations and explicitly distinguish **unverified** links from active listings.

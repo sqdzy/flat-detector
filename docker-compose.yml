@@ -112,6 +112,28 @@ services:
       FD_FEED_POLL_SECONDS: ${FD_FEED_POLL_SECONDS:-86400}
     command: ["python", "-m", "flat_detector.feed_cli"]
 
+  avito_probe:
+    build:
+      context: .
+      dockerfile: Dockerfile.scraper
+    image: flat-detector-avito-probe:staging
+    profiles: ["scraper"]
+    init: true
+    restart: "no"
+    user: "10001:10001"
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
+    read_only: true
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=64m"]
+    shm_size: "256m"
+    mem_limit: 768m
+    environment:
+      FD_AVITO_SEARCH_URL: ${FD_AVITO_SEARCH_URL:-}
+      FD_AVITO_PROFILE_DIR: /browser-profile
+    volumes:
+      - avito_browser_profile:/browser-profile
+    networks: [scraper_egress]
+
   mcp:
     <<: *app
     profiles: ["mcp"]
@@ -123,9 +145,12 @@ services:
 networks:
   internal:
     driver: bridge
+  scraper_egress:
+    driver: bridge
 
 volumes:
   pg_data:
+  avito_browser_profile:
 
 secrets:
   postgres_password_app:

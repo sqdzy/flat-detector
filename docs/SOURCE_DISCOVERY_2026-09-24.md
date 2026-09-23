@@ -32,3 +32,13 @@
 Разрабатываем пилотный сервис поиска однокомнатных квартир в ближних Химках. Интересует разрешённый программный поиск по району, цене и дате публикации, чтение статуса конкретной карточки (активно/снято/продано/под авансом), а также разрешения на ограниченное хранение и Telegram-уведомления подписчикам. Подскажите, существуют ли подходящие API/партнёрские фиды, условия подключения/тарифы, квоты, сроки хранения, ограничения на ссылки/поля и порядок согласования. Без вашего явного разрешения программный сбор с вашей площадки запускаться не будет.
 
 **Никаких писем операторам не отправлено.** Подробное независимое юридическое заключение не проводилось.
+## Free scraper feasibility track — 2026-09-24
+
+The owner chose a free scraper-first experiment. Current open-source evidence shows ordinary Playwright rendering is a practical baseline: active Avito projects use `data-marker="item"` / `item-title` hooks and browser rendering, while some projects also include anti-block/proxy/stealth features. flat-detector deliberately imports **none** of the latter. The first implementation is a one-shot, read-only Playwright probe with an operator-created Avito search URL and a persistent browser profile.
+
+References reviewed:
+- https://github.com/Duff89/parser_avito — active Avito monitoring project; useful architecture/selector reference, but its proxy/anti-block features are not adopted.
+- https://github.com/ergon73/avito-parser — demonstrates `data-marker` card extraction and supports Playwright with anti-bot tricks switchable off.
+- https://playwright.dev/python/docs/api/class-browsertype — official persistent-context API: `launch_persistent_context(user_data_dir=...)` keeps cookies/local storage across runs.
+
+This track remains technically and legally separate from a claim of platform authorization. If a live request returns 403/429/CAPTCHA/login challenge, flat-detector records no listing-removal conclusion and does not automatically escalate to evasive behavior.
