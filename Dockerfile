@@ -1,5 +1,5 @@
 FROM python:3.13.5-slim-bookworm AS runtime
-ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_DISABLE_PIP_VERSION_CHECK=1
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_DISABLE_PIP_VERSION_CHECK=1 PYTHONPATH=/app
 WORKDIR /app
 COPY requirements.txt /app/requirements.txt
 RUN python -m pip install --no-cache-dir -r requirements.txt \
@@ -7,6 +7,8 @@ RUN python -m pip install --no-cache-dir -r requirements.txt \
 COPY flat_detector /app/flat_detector
 COPY migrations /app/migrations
 COPY alembic.ini /app/alembic.ini
+# Fail the Docker build if the application package cannot be imported in this image.
+RUN python -c 'import flat_detector; import flat_detector.database'
 USER 10001:10001
 EXPOSE 8000
 CMD ["uvicorn", "flat_detector.web:app", "--host", "0.0.0.0", "--port", "8000", "--no-access-log"]

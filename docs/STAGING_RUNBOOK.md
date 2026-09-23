@@ -91,3 +91,27 @@ sudo docker compose --env-file .env logs --tail=60 db migrate web
 ## Recovery: missing `flat-detector-migrate:latest` after building only web
 
 Older revisions used a Compose-generated image name per service. `build web` created `flat-detector-web:latest`, but starting `migrate` with `--no-build` failed because `flat-detector-migrate:latest` did not exist. This version gives all Python services the same image tag `flat-detector-app:staging`, avoiding duplicate builds. On an already cloned deployment, retain existing `.env`, `deploy/secrets/*` and DB volume. After checking `git status --short`, run `git pull --ff-only origin feat/mvp-v0.2`, then `docker compose --env-file .env config --quiet` and `docker compose --env-file .env build web`. Only then repeat the migrate / web steps above. **Never** recreate passwords or use `down -v` to address a missing image.
+
+## Migration fix after initial `ModuleNotFoundError: No module named flat_detector`
+
+Revision after `919f153` sets Docker `PYTHONPATH=/app` and Alembic `prepend_sys_path = .` because the Alembic CLI's script directory may replace the working directory in Python's module lookup. This is a packaging/entrypoint issue, **not evidence that PostgreSQL must be reset**. Confirm an unchanged database and secrets; only fast-forward the source branch, validate Compose, rebuild the *shared application image*, and recreate **only the failed migrate service**:
+
+```bash
+cd /opt/flat-detector
+git status --short
+git pull --ff-only origin feat/mvp-v0.2
+docker compose --env-file .env config --quiet
+docker compose --env-file .env build web
+docker compose --env-file .env up -d --no-deps --no-build --force-recreate migrate
+CID="$(docker compose --env-file .env ps -a -q migrate)"
+test -n "$CID"
+EXIT_CODE="$(docker wait "$CID")"
+echo "Migration exit code: $EXIT_CODE"
+test "$EXIT_CODE" -eq 0
+# Only after exit 0:
+docker compose --env-file .env up -d --no-build web
+curl -fsS --max-time 5 http://127.0.0.1:8005/health/live
+curl -fsS --max-time 5 http://127.0.0.1:8005/health/ready
+```
+
+Do not recreate the database, change passwords, call `down -v`, or touch the FamilyCore Compose project. If migration fails again, collect only scrubbed migration log lines and stop before starting web.
