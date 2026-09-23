@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=80,<82"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "flat-detector"
+version = "0.2.0"
+description = "Permission-first apartment watch, opt-in Telegram digests, private read-only MCP"
+requires-python = ">=3.13,<3.14"
+
+[tool.setuptools.packages.find]
+include = ["flat_detector*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.coverage.run]
+source = ["flat_detector"]

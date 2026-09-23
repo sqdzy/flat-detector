@@ -1,0 +1,16 @@
+.env
+.venv/
+__pycache__/
+.pytest_cache/
+.coverage
+htmlcov/
+*.db
+*.sqlite
+deploy/secrets/*
+!deploy/secrets/.gitkeep
+*.log
+
+# Local plaintext database dumps must never be committed.
+backups/
+*.dump
+*.dump.partial

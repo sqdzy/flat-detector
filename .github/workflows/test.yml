@@ -1,0 +1,66 @@
+name: Python tests
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: flat_detector_ci
+          POSTGRES_USER: flat_detector
+          POSTGRES_PASSWORD: local_ci_only_password
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U flat_detector -d flat_detector_ci"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 12
+    env:
+      FD_PG_INTEGRATION_DSN: postgresql+psycopg://flat_detector:local_ci_only_password@127.0.0.1:5432/flat_detector_ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Install project dependencies
+        run: python -m pip install -r requirements-dev.txt
+      - name: Unit, MCP SDK and PostgreSQL integration tests
+        run: python -m pytest -q --cov=flat_detector --cov-report=term-missing
+      - name: Validate Docker Compose configuration (no containers started)
+        run: |
+          mkdir -p deploy/secrets
+          printf 'ci-example-only\n' > deploy/secrets/postgres_password_app
+          printf 'ci-example-only\n' > deploy/secrets/postgres_password_db
+          printf 'ci-example-only\n' > deploy/secrets/telegram_token
+          docker compose --profile telegram --profile mcp --profile approved_feed --profile scraper config --quiet
+          docker compose --profile telegram --profile mcp --profile approved_feed --profile scraper config --format json | python -c 'import json,sys; services=json.load(sys.stdin)["services"]; names=("web","migrate","bot","scheduler","sender","mcp","approved_feed"); images={services[n]["image"] for n in names}; assert images == {"flat-detector-app:staging"}, images'
+      - name: "Dockerized staging script integration: build, image provenance, migration, API"
+        run: |
+          set -euo pipefail
+          cp .env.example .env
+          docker compose --env-file .env up -d --no-build --wait db
+          bash scripts/staging_up.sh
+      - name: "Backup archive and isolated PostgreSQL restore verification"
+        run: |
+          set -euo pipefail
+          sudo env FD_BACKUP_DIR="$RUNNER_TEMP/flat_detector_backup_proof" bash scripts/backup_verify.sh
+          test "$(sudo find "$RUNNER_TEMP/flat_detector_backup_proof" -maxdepth 1 -type f -name '*.dump' | wc -l)" -eq 1
+      - name: "Owner-only Telegram pilot dry-run (zero real messages)"
+        run: |
+          set -euo pipefail
+          docker compose --profile telegram run --rm --no-deps -T bot python -c 'from datetime import datetime, timezone; from flat_detector.database import Session; from flat_detector.models import Subscriber; db=Session(); db.add(Subscriber(chat_id=999999, active=True, consent_at=datetime.now(timezone.utc))); db.commit(); db.close()'
+          docker compose --profile telegram run --rm --no-deps -T bot python -m flat_detector.pilot | tee "$RUNNER_TEMP/pilot-dry-run.log"
+          grep -q "DRY RUN ONLY" "$RUNNER_TEMP/pilot-dry-run.log"
+      - name: "Isolated Playwright scraper image + offline Chromium smoke"
+        run: |
+          set -euo pipefail
+          docker compose --env-file .env --profile scraper build avito_probe
+          docker compose --env-file .env --profile scraper run --rm --no-deps -T avito_probe --smoke
+      - name: Compile
+        run: python -m compileall -q flat_detector
